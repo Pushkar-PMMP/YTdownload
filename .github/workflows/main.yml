@@ -1,0 +1,31 @@
+name: Upload video to YouTube
+
+on:
+  google_drive:
+    types: [created]
+    paths:
+      - "path/to/folder/on/drive"
+
+jobs:
+  upload-video:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.8
+    - name: Install dependencies
+      run: |
+        python -m venv env
+        source env/bin/activate
+        pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+    - name: Get video file
+      id: get_video
+      run: |
+        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.drive, json; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); drive_service = google.drive.build('v3', credentials=creds); file_id = json.loads(env.get('GITHUB_EVENT_PAYLOAD'))['fileId']; file = drive_service.files().get(fileId=file_id, fields='*').execute(); file_name = file['name']; file_url = f'https://drive.google.com/uc?id={file_id}'; parent_id = file['parents'][0]; parent_folder = drive_service.files().get(fileId=parent_id, fields='*').execute(); folder_name = parent_folder['name']; print(file_name, file_url, folder_name)"
+    - name: Upload video to YouTube
+      run: |
+        source env/bin/activate
+        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.youtube, json; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); youtube = google.youtube.build('v3', credentials=creds); file_name = json.loads(env.get('steps.get_video.outputs.file_name'))[0]; file_url = json.loads(env.get('steps.get_video.outputs.file_url'))[0]; folder_name = json.loads(env.get('steps.get_video.outputs.folder_name'))[0]; if folder_name == 'TOONS': channel_id = '287287272788' elif folder_name == 'CLIPS': channel_id = '8827827378398' else: channel_id = ''; if channel_id: youtube.videos().insert(part='snippet,status', body={'snippet': {'title':file_name, 'description': 'Video uploaded via GitHub Action', 'channelId': channel_id}, 'status': {'privacyStatus': 'unlisted'}}, media_body=file_url).execute()"
