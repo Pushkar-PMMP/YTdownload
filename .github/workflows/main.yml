@@ -1,29 +1,8 @@
-name: Upload video to YouTube Hmm
-
-on:
-  schedule:
-    - cron: "*/1 * * * *" # Run every 15 minutes
-
-jobs:
-  upload-video:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: 3.8
-    - name: Install dependencies
-      run: |
-        python -m venv env
-        source env/bin/activate
-        pip install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
-    - name: Get new files
+- name: Get new files
       run: |
         source env/bin/activate
-        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.drive, json, datetime; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); drive_service = google.drive.build('v3', credentials=creds); query = 'mimeType='application/vnd.google-apps.video'' + ' and trashed = false' + ' and modifiedTime > "' + (datetime.datetime.now() - datetime.timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M:%S') + '"'; results = drive_service.files().list(q=query,fields='nextPageToken, files(id, name, parents)').execute(); for item in results.get('files', []): file_id = item['id']; parent_id = item['parents'][0]; parent_folder = drive_service.files().get(fileId=parent_id, fields='*').execute(); folder_name = parent_folder['name']; print(file_id, item['name'], folder_name)"
+        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.drive, json, datetime; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); drive_service = google.drive.build('v3', credentials=creds); query = 'mimeType='application/vnd.google-apps.video'' + ' and trashed = false' + ' and modifiedTime > "' + (datetime.datetime.now() - datetime.timedelta(minutes=15)).strftime('%Y-%m-%dT%H:%M:%S') + '"'; results = drive_service.files().list(q=query,fields='nextPageToken, files(id, name, parents)').execute(); for item in results.get('files', []): file_id = item['id']; parent_id = item['parents'][0]; parent_folder = drive_service.files().get(fileId=parent_id, fields='*').execute(); folder_name = parent_folder['name']; print('File id:',file_id,'File name:',item['name'],'Folder name:',folder_name)"
     - name: Upload video to YouTube
       run: |
         source env/bin/activate
-        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.youtube, json; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); youtube = google.youtube.build('v3', credentials=creds); file_id = json.loads(env.get('steps.get_new_files.outputs.file_id'))[0]; file_name = json.loads(env.get('steps.get_new_files.outputs.file_name'))[0]; folder_name = json.loads(env.get('steps.get_new_files.outputs.folder_name'))[0]; if folder_name == 'TOONS': channel_id = 'UCmVTDaszwlEhrGoXlWCXtEw' elif folder_name == 'CLIPS': channel_id = 'UC1pALRWiq32RQ0JyXfM5W9A' else: channel_id = ''; if channel_id: file_url = 'https://drive.google.com/file/d/' + file_id; youtube.videos().insert(part='snippet,status', body={'snippet': {'title': file_name, 'description': 'Video uploaded via GitHub Action', 'channelId': channel_id}, 'status': {'privacyStatus': 'public'}}, media_body=file_url).execute()"
+        python -c "import google.auth, google.auth.transport, google.auth.transport.requests, google.api_core.exceptions, google.youtube, json; creds = google.auth.credentials.Credentials.from_authorized_user_info(json.loads(env.get('GITHUB_EVENT_PAYLOAD'))); youtube = google.youtube.build('v3', credentials=creds); file_id = json.loads(env.get('steps.get_new_files.outputs.file_id'))[0]; file_name = json.loads(env.get('steps.get_new_files.outputs.file_name'))[0]; folder_name = json.loads(env.get('steps.get_new_files.outputs.folder_name'))[0]; if folder_name == 'TOONS': channel_id = 'UCmVTDaszwlEhrGoXlWCXtEw' elif folder_name == 'CLIPS': channel_id = 'UC1pALRWiq32RQ0JyXfM5W9A' else: channel_id = ''; if channel_id: file_url = 'https://drive.google.com/file/d/' + file_id; youtube.videos().insert(part='snippet,status', body={'snippet': {'title': file_name, 'description': 'Video uploaded via GitHub Action', 'channelId': channel_id}, 'status': {'privacyStatus': 'unlisted'}}, media_body=file_url).execute();print('Uploaded video:', file_name,'to channel:',channel_id) else: print('Not uploaded as folder name does not match')"
